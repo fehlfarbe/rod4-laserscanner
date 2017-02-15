@@ -23,12 +23,13 @@ class ROD4Scanner(object):
     __values_update = time.time()
     __values_x = []
     __values_y = []
-    __distances = []
+    #__distances = []
     
     __avg_len = 10
     __avg_values = collections.deque(maxlen=__avg_len)
     
     __angle = 190
+    __distance_max = 50000
     
     def __init__(self, port='/dev/ttyUSB0', baudrate=57600):
         self.__serial = serial.Serial(port, baudrate)
@@ -61,10 +62,10 @@ class ROD4Scanner(object):
                     if val == 254:
                         i3 += 1
             if i3 == 3:
-                scan_res = self.__read_serial() # gibt die Scanneraufloesung an (1=sehr hoch, 8=sehr niedrig)
-                multSegB = self.__read_serial() # Startsegmentmultiplikator []=0 1=256 2=512  
+                scan_res = self.__read_serial()  # gibt die Scanneraufloesung an (1=sehr hoch, 8=sehr niedrig)
+                multSegB = self.__read_serial()  # Startsegmentmultiplikator []=0 1=256 2=512
                 segB = self.__read_serial()     # gibt an, mit welchem Segment der Scanner beginnt; Segment=MultSegB*256+SegB-1, weil 0 nicht ausgegeben wird  
-                multSegE = self.__read_serial() # Endsegmentmultiplikator []=0 1=256 2=512
+                multSegE = self.__read_serial()  # Endsegmentmultiplikator []=0 1=256 2=512
                 segE = self.__read_serial()     # gibt an, mit welchem Segment der Scanner aufhoert; Segment=MultSegE*256+SegE-1, weil 0 nicht ausgegeben wird
                 
                 scan_res = float(scan_res)
@@ -97,7 +98,7 @@ class ROD4Scanner(object):
                 for i in range(0, countVal):
                     mult = self.__read_serial()  # multiplikator
                     v = float(self.__read_serial())  # value
-                    dist = mult * 256 + v - 1
+                    dist = min(mult * 256 + v - 1, self.__distance_max)
                     resolution = 0.36 * scan_res
                     angle = (i*resolution)+startsegDeg-5.0
                     if not self.__angle_in_range(angle):
@@ -115,23 +116,7 @@ class ROD4Scanner(object):
                     self.__values_x = x_vals
                     self.__values_y = y_vals
                     self.__avg_values.append((self.__values_x, self.__values_y))
-                    self.__values_update = time.time()
-                # get avergae
-                #average.append([x_vals, y_vals])    
-                #avg_x, avg_y = average.get_average()
-                # plot
-                #max_y = max(max_y, max(y_vals))
-                #pyplot.clf()
-                #pyplot.plot(x_vals, y_vals)
-                #pyplot.plot(avg_x, avg_y)
-                #pyplot.plot(distances)
-                #pyplot.ylim([0, max_y])
-                #pyplot.xlim([-300, 300])
-                #pyplot.draw()
-            
-            #pyplot.show(block=False)
-            
-            #print "[%d] : %s" % (count, line)
+
             count += 1
         
     def __enter__(self):
@@ -152,20 +137,32 @@ class ROD4Scanner(object):
     @angle.setter
     def angle(self, value):
         self.__angle = min(self.MAX_ANGLE, max(5, value))
+
+    @property
+    def distance_max(self):
+        return self.__distance_max
+
+    @distance_max.setter
+    def distance_max(self, value):
+        self.__distance_max = value
             
     def last_values(self):
         return self.__values_x, self.__values_y
     
     def values(self):
-        t0 = time.time()
-        while t0-self.__values_update > 0:
-            time.sleep(0.01)
-        return self.__values_x, self.__values_y
+        x_vals = []
+        y_vals = []
+        with self.__lock:
+            x_vals = self.__values_x
+            y_vals = self.__values_y
+        return x_vals, y_vals
     
     def avg_values(self):
-        avg = list(self.__avg_values)
+
+        with self.__lock:
+            avg = list(self.__avg_values)
+
         l = len(avg)
-                
         if l == 0:
             return [], []
         
@@ -177,5 +174,5 @@ class ROD4Scanner(object):
                 x_vals[i] += x/l
             for i, y in enumerate(a[1]):
                 y_vals[i] += y/l
-                
+
         return x_vals, y_vals

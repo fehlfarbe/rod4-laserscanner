@@ -23,13 +23,18 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
     
     with ROD4Scanner() as scanner:
+        scanner.distance_max = 5000
         while True:
             try:
                 x, y = scanner.values()
+                x_avg, y_avg = scanner.avg_values()
                 pyplot.clf()
                 pyplot.plot(x, y, c='r')
+                pyplot.plot(x_avg, y_avg, c='b')
                 pyplot.pause(0.001)
-                print(x)
-                print(y)
+                #print(x)
+                #print(y)
+                if len(x) > 0 and len(y) > 0:
+                    print(max(x), max(y))
             except KeyboardInterrupt:
                 break
