@@ -1,2 +1,2 @@
 # rod4-laserscanner
-Python script for Leutze ROD4 Laserscanner
+Python script for Leuze ROD4 Laserscanner
